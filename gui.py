@@ -1,0 +1,144 @@
+"""
+Qt-Benutzeroberfläche für EDP-Gesundheitskarte-Proxy.
+Zeigt Kartenlese-Gerätestatus und Log der Kartenlese-Events an.
+"""
+
+from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit
+from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QFont
+from card_reader_worker import CardReaderWorker
+
+
+class CardReaderGUI(QMainWindow):
+    """Hauptfenster für die Kartenlese-Geräteüberwachung."""
+    
+    def __init__(self):
+        super().__init__()
+        self.worker = None
+        self.init_ui()
+        self.start_monitoring()
+        
+    def init_ui(self):
+        """Initialisiere die Benutzeroberfläche."""
+        self.setWindowTitle("EDP-Gesundheitskarte-Proxy - Kartenlese-Geräteüberwachung")
+        self.setGeometry(100, 100, 900, 600)
+        self.setMinimumSize(QSize(800, 500))
+        self.setStyleSheet(self._get_stylesheet())
+        
+        # Erstelle zentrales Widget und Hauptlayout
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        
+        # Kopfzeilenbereich
+        header_layout = QHBoxLayout()
+        header_label = QLabel("Kartenlese-Geräteüberwachung")
+        header_font = QFont()
+        header_font.setPointSize(14)
+        header_font.setBold(True)
+        header_label.setFont(header_font)
+        header_layout.addWidget(header_label)
+        header_layout.addStretch()
+        
+        # Status-Indikator
+        self.status_indicator = QLabel("⚫")
+        self.status_indicator.setStyleSheet("color: gray; font-size: 20px;")
+        self.status_indicator.setToolTip("Kartenlese-Gerät-Status: Getrennt")
+        header_layout.addWidget(self.status_indicator)
+        
+        self.status_text = QLabel("Wird initialisiert...")
+        self.status_text.setStyleSheet("color: gray; font-weight: bold; font-size: 12px;")
+        header_layout.addWidget(self.status_text)
+        
+        main_layout.addLayout(header_layout)
+        
+        # Log-Bereich Beschriftung
+        log_label = QLabel("Ereignisprotokoll:")
+        log_font = QFont()
+        log_font.setPointSize(11)
+        log_font.setBold(True)
+        log_label.setFont(log_font)
+        main_layout.addWidget(log_label)
+        
+        # Log-Anzeige
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        self.log_text.setFont(QFont("Courier", 9))
+        main_layout.addWidget(self.log_text)
+        
+    def _get_stylesheet(self):
+        """Gebe benutzerdefinierten Stylesheet für die Anwendung zurück."""
+        return """
+            QMainWindow {
+                background-color: #f5f5f5;
+            }
+            QLabel {
+                color: #333;
+            }
+            QTextEdit {
+                background-color: white;
+                color: #333;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QStatusBar {
+                background-color: #e0e0e0;
+                color: #333;
+            }
+        """
+    
+    def add_log(self, message):
+        """Füge eine Nachricht zum Log hinzu."""
+        self.log_text.append(message)
+        
+        # Automatisches Scrollen nach unten
+        scrollbar = self.log_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+    
+    def on_reader_connected(self, connected):
+        """Verwalte Änderung des Kartenlese-Gerät-Verbindungsstatus."""
+        if connected:
+            self.status_indicator.setText("🟢")
+            self.status_indicator.setStyleSheet("color: #4CAF50; font-size: 20px;")
+            self.status_indicator.setToolTip("Kartenlese-Gerät-Status: Verbunden")
+            self.status_text.setText("Verbunden")
+            self.status_text.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 12px;")
+        else:
+            self.status_indicator.setText("🔴")
+            self.status_indicator.setStyleSheet("color: #f44336; font-size: 20px;")
+            self.status_indicator.setToolTip("Kartenlese-Gerät-Status: Getrennt")
+            self.status_text.setText("Getrennt")
+            self.status_text.setStyleSheet("color: #f44336; font-weight: bold; font-size: 12px;")
+    
+    def on_card_read_success(self, patient_data):
+        """Verwalte erfolgreiche Kartenlese."""
+        pass
+    
+    def on_card_read_failed(self, error_message):
+        """Verwalte fehlgeschlagene Kartenlese."""
+        pass
+    
+    def on_log_message(self, message):
+        """Verwalte Log-Nachricht vom Worker."""
+        self.add_log(message)
+    
+    def start_monitoring(self):
+        """Starte die Kartenlese-Geräteüberwachung."""
+        self.add_log("Starte Kartenlese-Geräteüberwachung...")
+        
+        # Erstelle und starte Worker-Thread
+        self.worker = CardReaderWorker(polling_interval=1000)
+        self.worker.reader_connected.connect(self.on_reader_connected)
+        self.worker.card_read_success.connect(self.on_card_read_success)
+        self.worker.card_read_failed.connect(self.on_card_read_failed)
+        self.worker.log_message.connect(self.on_log_message)
+        self.worker.start()
+    
+    def closeEvent(self, event):
+        """Verwalte Fenster-Schließ-Event."""
+        if self.worker:
+            self.worker.stop()
+        event.accept()
