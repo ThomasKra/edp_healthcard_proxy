@@ -48,7 +48,7 @@ class CardReaderWorker(QThread):
         return datetime.now().strftime("%H:%M:%S")
     
     def _check_reader_and_read_card(self):
-        """Überprüfe, ob Lesegerät verbunden ist und versuche Karte zu lesen."""
+        """Überprüfe, ob Lesegerät verbunden ist."""
         if not self.is_running:
             self.quit()
             return
@@ -65,10 +65,6 @@ class CardReaderWorker(QThread):
                 self.log_message.emit(f"[{self._get_timestamp()}] ✓ Kartenlesegerät verbunden")
             else:
                 self.log_message.emit(f"[{self._get_timestamp()}] ✗ Kartenlesegerät getrennt")
-        
-        # Falls Lesegerät verfügbar ist, versuche Karte zu lesen
-        if reader_available:
-            self._attempt_card_read()
     
     def _is_reader_available(self):
         """Überprüfe, ob ein Kartenlesegerät verfügbar ist."""
@@ -78,23 +74,6 @@ class CardReaderWorker(QThread):
             return len(available_readers) > 0
         except Exception:
             return False
-    
-    def _attempt_card_read(self):
-        """Versuche eine Karte vom angeschlossenen Lesegerät zu lesen."""
-        try:
-            patient_data = egk.read_egk()
-            self.log_message.emit(
-                f"[{self._get_timestamp()}] ✓ Karte erfolgreich gelesen - "
-                f"{patient_data.get('Vorname', '')} {patient_data.get('Nachname', '')}"
-            )
-            self.card_read_success.emit(patient_data)
-        except Exception as e:
-            # Keine Spam-Logs für "keine Karte vorhanden" Szenarien
-            if "No reader found" not in str(e) and "truncated" not in str(e).lower():
-                self.log_message.emit(
-                    f"[{self._get_timestamp()}] ✗ Kartenlesen fehlgeschlagen - {str(e)}"
-                )
-            self.card_read_failed.emit(str(e))
     
     def stop(self):
         """Stoppe den Worker-Thread."""

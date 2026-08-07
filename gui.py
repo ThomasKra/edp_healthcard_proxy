@@ -4,10 +4,43 @@ Zeigt Kartenlese-Gerätestatus und Log der Kartenlese-Events an.
 """
 
 from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, pyqtSignal, QObject
 from PyQt5.QtGui import QFont
+from threading import Thread
 from card_reader_worker import CardReaderWorker
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
+from datetime import datetime
+import json
+import egk
 
+class GuiLogBridge(QObject):
+    message = pyqtSignal(str)
+class HealthCardHTTPServer(ThreadingHTTPServer):
+    def __init__(self, server_address, handler_class, log_bridge):
+        super().__init__(server_address, handler_class)
+        self.log_bridge = log_bridge
+
+        self.log_bridge.message.emit('HTTPServer started')
+
+class HealthCardRequestHandler(BaseHTTPRequestHandler):
+
+    def _set_headers(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        
+    def do_HEAD(self):
+        self._set_headers()
+        
+    # GET sends back a Hello world message
+    def do_GET(self):
+        self._set_headers()
+        json_str = json.dumps(egk.read_egk())
+        self.wfile.write(bytes(json_str.encode(encoding='utf-8')))
+
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.server.log_bridge.message.emit(f"[{timestamp}] Lesen erfolgreich")
 
 class CardReaderGUI(QMainWindow):
     """Hauptfenster für die Kartenlese-Geräteüberwachung."""
@@ -15,10 +48,17 @@ class CardReaderGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.worker = None
+        self.log_bridge = GuiLogBridge()
+        self.log_bridge.message.connect(self.add_log)
+
         self.init_ui()
         self.start_monitoring()
+
         
     def init_ui(self):
+
+        
+
         """Initialisiere die Benutzeroberfläche."""
         self.setWindowTitle("EDP-Gesundheitskarte-Proxy - Kartenlese-Geräteüberwachung")
         self.setGeometry(100, 100, 900, 600)
@@ -67,6 +107,19 @@ class CardReaderGUI(QMainWindow):
         self.log_text.setReadOnly(True)
         self.log_text.setFont(QFont("Courier", 9))
         main_layout.addWidget(self.log_text)
+
+        server_port = 2080
+        server_address = ('', server_port)
+        self.http_server = HealthCardHTTPServer(server_address, HealthCardRequestHandler, self.log_bridge)
+        self.http_thread = Thread(
+            target=self.http_server.serve_forever,
+            daemon=True,
+        )
+
+        self.http_thread.start()
+
+        self.add_log(f"HTTP-Server auf 127.0.0.1:{server_port} gestartet")
+
         
     def _get_stylesheet(self):
         """Gebe benutzerdefinierten Stylesheet für die Anwendung zurück."""
@@ -136,9 +189,16 @@ class CardReaderGUI(QMainWindow):
         self.worker.card_read_failed.connect(self.on_card_read_failed)
         self.worker.log_message.connect(self.on_log_message)
         self.worker.start()
+
+    def stop_http_server(self):
+      if getattr(self, "http_server", None):
+          self.http_server.shutdown()
+          self.http_server.server_close()
+          self.http_server = None
     
     def closeEvent(self, event):
         """Verwalte Fenster-Schließ-Event."""
         if self.worker:
             self.worker.stop()
+        self.stop_http_server()
         event.accept()
