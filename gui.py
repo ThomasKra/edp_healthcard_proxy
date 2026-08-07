@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from datetime import datetime
 import json
 import egk
+from smartcard.Exceptions import NoCardException, CardConnectionException
 
 class GuiLogBridge(QObject):
     message = pyqtSignal(str)
@@ -36,11 +37,21 @@ class HealthCardRequestHandler(BaseHTTPRequestHandler):
     # GET sends back a Hello world message
     def do_GET(self):
         self._set_headers()
-        json_str = json.dumps(egk.read_egk())
-        self.wfile.write(bytes(json_str.encode(encoding='utf-8')))
-
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.server.log_bridge.message.emit(f"[{timestamp}] Lesen erfolgreich")
+        try:
+          json_str = json.dumps(egk.read_egk())
+          self.wfile.write(bytes(json_str.encode(encoding='utf-8')))
+          self.server.log_bridge.message.emit(f"[{timestamp}] Lesen erfolgreich")
+        except NoCardException:
+            self.server.log_bridge.message.emit(f"[{timestamp}] Lesen fehlgeschlagen - keine Karte gesteckt")
+        except CardConnectionException:
+            self.server.log_bridge.message.emit(f"[{timestamp}] Lesen fehlgeschlagen - Karte steckt nicht richtig")
+        except Exception as e:
+            self.server.log_bridge.message.emit(f"[{timestamp}] Lesen fehlgeschlagen - {str(e)}")
+            
+            
+
+        
 
 class CardReaderGUI(QMainWindow):
     """Hauptfenster für die Kartenlese-Geräteüberwachung."""
