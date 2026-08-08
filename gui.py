@@ -59,13 +59,16 @@ class CardReaderGUI(QMainWindow):
 
         self.init_ui()
         self.start_monitoring()
+        self.start_http_server()
 
         
     def init_ui(self):
         """Initialisiere die Benutzeroberfläche."""
         self.setWindowTitle("EDP-GK-Proxy - Kartenleser-Überwachung")
-        self.setGeometry(100, 100, 500, 400)
-        self.setMinimumSize(QSize(500, 400))
+        min_height = 200
+        min_width = 500
+        self.setGeometry(100, 100, min_width, min_height)
+        self.setMinimumSize(QSize(min_width, min_height))
         self.setStyleSheet(self._get_stylesheet())
         
         # Erstelle zentrales Widget und Hauptlayout
@@ -106,6 +109,7 @@ class CardReaderGUI(QMainWindow):
         self.log_text.setFont(QFont("Courier", 9))
         main_layout.addWidget(self.log_text)
 
+    def start_http_server(self):
         server_port = 2080
         server_address = ('', server_port)
         self.http_server = HealthCardHTTPServer(server_address, HealthCardRequestHandler, self.log_bridge)
@@ -115,8 +119,6 @@ class CardReaderGUI(QMainWindow):
         )
 
         self.http_thread.start()
-
-        self.add_log(f"HTTP-Server auf 127.0.0.1:{server_port} gestartet")
 
         
     def _get_stylesheet(self):
