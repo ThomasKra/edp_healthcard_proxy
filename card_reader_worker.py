@@ -31,7 +31,7 @@ class CardReaderWorker(QThread):
         """Hauptschleife - Kontinuierlich Lesegerät überprüfen und Karten lesen."""
         from PyQt5.QtCore import QTimer
         
-        self.log_message.emit(f"[{self._get_timestamp()}] Kartenlese-Worker gestartet")
+        self.log_message.emit(f"Kartenlese-Worker gestartet")
         
         # Erstelle einen Timer für Abfragen
         timer = QTimer()
@@ -40,10 +40,6 @@ class CardReaderWorker(QThread):
         
         # Halte den Thread am Laufen
         self.exec_()
-        
-    def _get_timestamp(self):
-        """Erhalte aktuellen Zeitstempel im HH:MM:SS Format."""
-        return datetime.now().strftime("%H:%M:%S")
     
     def _check_reader_and_read_card(self):
         """Überprüfe, ob Lesegerät verbunden ist."""
@@ -60,9 +56,9 @@ class CardReaderWorker(QThread):
             self.last_reader_state = reader_available
             
             if reader_available:
-                self.log_message.emit(f"[{self._get_timestamp()}] ✓ Kartenlesegerät verbunden")
+                self.log_message.emit(f"✓ Kartenlesegerät verbunden")
             else:
-                self.log_message.emit(f"[{self._get_timestamp()}] ✗ Kartenlesegerät getrennt")
+                self.log_message.emit(f"✗ Kartenlesegerät getrennt")
     
     def _is_reader_available(self):
         """Überprüfe, ob ein Kartenlesegerät verfügbar ist."""
