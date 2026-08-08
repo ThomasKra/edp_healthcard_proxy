@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=EDP Gesundheitskarte Proxy
+GenericName=Gesundheitskarten-Proxy
+Comment=Überwachung des Gesundheitskartenlesers
+Exec=python3 /opt/edp_healthcard_proxy/main_gui.py
+Icon=/opt/edp_healthcard_proxy/Icon.png
+Terminal=false
+Categories=Utility;System;
+StartupNotify=true
