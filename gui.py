@@ -3,9 +3,9 @@ Qt-Benutzeroberfläche für EDP-Gesundheitskarte-Proxy.
 Zeigt Kartenlese-Gerätestatus und Log der Kartenlese-Events an.
 """
 
-from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit
+from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit,  QSystemTrayIcon, QMenu, QAction
 from PyQt5.QtCore import Qt, QSize, pyqtSignal, QObject
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QIcon
 from threading import Thread
 from card_reader_worker import CardReaderWorker
 from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
@@ -59,6 +59,8 @@ class CardReaderGUI(QMainWindow):
 
         self.init_ui()
         self.start_monitoring()
+        self._allow_close = False
+        self.init_tray()
         self.start_http_server()
 
         
@@ -189,7 +191,66 @@ class CardReaderGUI(QMainWindow):
     
     def closeEvent(self, event):
         """Verwalte Fenster-Schließ-Event."""
+        if self._allow_close:
+          if self.worker:
+              self.worker.stop()
+          self.stop_http_server()
+          event.accept()
+        else:
+          self.hide()
+          self.tray_icon.showMessage(
+              "EDP-Gesundheitskarte-Proxy",
+              "Die Anwendung läuft weiter im Infobereich.",
+              QSystemTrayIcon.Information,
+              3000
+          )
+          event.ignore()
+
+    def init_tray(self):
+      self.tray_icon = QSystemTrayIcon(self)
+
+      icon = QIcon.fromTheme("media-flash")
+      if icon.isNull():
+          icon = self.style().standardIcon(self.style().SP_ComputerIcon)
+
+      self.tray_icon.setIcon(icon)
+      self.setWindowIcon(icon)
+      self.tray_icon.setToolTip("EDP-Gesundheitskarte-Proxy")
+
+      tray_menu = QMenu()
+
+      show_action = QAction("Anzeigen", self)
+      hide_action = QAction("Verstecken", self)
+      quit_action = QAction("Beenden", self)
+
+      show_action.triggered.connect(self.show_window)
+      hide_action.triggered.connect(self.hide)
+      quit_action.triggered.connect(self.quit_application)
+
+      tray_menu.addAction(show_action)
+      tray_menu.addAction(hide_action)
+      tray_menu.addSeparator()
+      tray_menu.addAction(quit_action)
+
+      self.tray_icon.setContextMenu(tray_menu)
+      self.tray_icon.activated.connect(self.on_tray_activated)
+      self.tray_icon.show()
+
+    def show_window(self):
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def on_tray_activated(self, reason):
+        if reason == QSystemTrayIcon.Trigger:
+            if self.isVisible():
+                self.hide()
+            else:
+                self.show_window()
+
+    def quit_application(self):
+        self._allow_close = True
+        self.tray_icon.hide()
         if self.worker:
             self.worker.stop()
-        self.stop_http_server()
-        event.accept()
+        self.close()
