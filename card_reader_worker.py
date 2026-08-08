@@ -13,8 +13,6 @@ class CardReaderWorker(QThread):
     
     # Signale
     reader_connected = pyqtSignal(bool)  # bool: True wenn Lesegerät verbunden
-    card_read_success = pyqtSignal(dict)  # dict: Patientendaten
-    card_read_failed = pyqtSignal(str)  # str: Fehlermeldung
     log_message = pyqtSignal(str)  # str: Log-Nachricht
     
     def __init__(self, polling_interval=1000):

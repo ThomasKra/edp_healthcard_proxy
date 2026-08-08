@@ -37,21 +37,16 @@ class HealthCardRequestHandler(BaseHTTPRequestHandler):
     # GET sends back a Hello world message
     def do_GET(self):
         self._set_headers()
-        timestamp = datetime.now().strftime("%H:%M:%S")
         try:
           json_str = json.dumps(egk.read_egk())
           self.wfile.write(bytes(json_str.encode(encoding='utf-8')))
-          self.server.log_bridge.message.emit(f"[{timestamp}] Lesen erfolgreich")
+          self.server.log_bridge.message.emit("Lesen erfolgreich")
         except NoCardException:
-            self.server.log_bridge.message.emit(f"[{timestamp}] Lesen fehlgeschlagen - keine Karte gesteckt")
+            self.server.log_bridge.message.emit("Lesen fehlgeschlagen - keine Karte gesteckt")
         except CardConnectionException:
-            self.server.log_bridge.message.emit(f"[{timestamp}] Lesen fehlgeschlagen - Karte steckt nicht richtig")
+            self.server.log_bridge.message.emit("Lesen fehlgeschlagen - Karte steckt nicht richtig")
         except Exception as e:
-            self.server.log_bridge.message.emit(f"[{timestamp}] Lesen fehlgeschlagen - {str(e)}")
-            
-            
-
-        
+            self.server.log_bridge.message.emit(f"Lesen fehlgeschlagen - {str(e)}")
 
 class CardReaderGUI(QMainWindow):
     """Hauptfenster für die Kartenlese-Geräteüberwachung."""
@@ -67,13 +62,10 @@ class CardReaderGUI(QMainWindow):
 
         
     def init_ui(self):
-
-        
-
         """Initialisiere die Benutzeroberfläche."""
-        self.setWindowTitle("EDP-Gesundheitskarte-Proxy - Kartenlese-Geräteüberwachung")
-        self.setGeometry(100, 100, 900, 600)
-        self.setMinimumSize(QSize(800, 500))
+        self.setWindowTitle("EDP-GK-Proxy - Kartenleser-Überwachung")
+        self.setGeometry(100, 100, 500, 400)
+        self.setMinimumSize(QSize(500, 400))
         self.setStyleSheet(self._get_stylesheet())
         
         # Erstelle zentrales Widget und Hauptlayout
@@ -85,13 +77,6 @@ class CardReaderGUI(QMainWindow):
         
         # Kopfzeilenbereich
         header_layout = QHBoxLayout()
-        header_label = QLabel("Kartenlese-Geräteüberwachung")
-        header_font = QFont()
-        header_font.setPointSize(14)
-        header_font.setBold(True)
-        header_label.setFont(header_font)
-        header_layout.addWidget(header_label)
-        header_layout.addStretch()
         
         # Status-Indikator
         self.status_indicator = QLabel("⚫")
@@ -102,6 +87,8 @@ class CardReaderGUI(QMainWindow):
         self.status_text = QLabel("Wird initialisiert...")
         self.status_text.setStyleSheet("color: gray; font-weight: bold; font-size: 12px;")
         header_layout.addWidget(self.status_text)
+
+        header_layout.addStretch()
         
         main_layout.addLayout(header_layout)
         
@@ -154,9 +141,10 @@ class CardReaderGUI(QMainWindow):
             }
         """
     
-    def add_log(self, message):
+    def add_log(self, message, *, timestamp = None):
         """Füge eine Nachricht zum Log hinzu."""
-        self.log_text.append(message)
+        timestamp = timestamp if timestamp is not None else datetime.now().strftime("%H:%M:%S")
+        self.log_text.append(f"[{timestamp}] {message}")
         
         # Automatisches Scrollen nach unten
         scrollbar = self.log_text.verticalScrollBar()
@@ -177,14 +165,6 @@ class CardReaderGUI(QMainWindow):
             self.status_text.setText("Getrennt")
             self.status_text.setStyleSheet("color: #f44336; font-weight: bold; font-size: 12px;")
     
-    def on_card_read_success(self, patient_data):
-        """Verwalte erfolgreiche Kartenlese."""
-        pass
-    
-    def on_card_read_failed(self, error_message):
-        """Verwalte fehlgeschlagene Kartenlese."""
-        pass
-    
     def on_log_message(self, message):
         """Verwalte Log-Nachricht vom Worker."""
         self.add_log(message)
@@ -196,8 +176,6 @@ class CardReaderGUI(QMainWindow):
         # Erstelle und starte Worker-Thread
         self.worker = CardReaderWorker(polling_interval=1000)
         self.worker.reader_connected.connect(self.on_reader_connected)
-        self.worker.card_read_success.connect(self.on_card_read_success)
-        self.worker.card_read_failed.connect(self.on_card_read_failed)
         self.worker.log_message.connect(self.on_log_message)
         self.worker.start()
 
