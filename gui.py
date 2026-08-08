@@ -148,11 +148,19 @@ class CardReaderGUI(QMainWindow):
     def add_log(self, message, *, timestamp = None):
         """Füge eine Nachricht zum Log hinzu."""
         timestamp = timestamp if timestamp is not None else datetime.now().strftime("%H:%M:%S")
-        self.log_text.append(f"[{timestamp}] {message}")
+        log_message = f"[{timestamp}] {message}"
+        self.log_text.append(log_message)
         
         # Automatisches Scrollen nach unten
         scrollbar = self.log_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
+        if hasattr(self, "tray_icon") and self.tray_icon.supportsMessages():
+          self.tray_icon.showMessage(
+              "EDP-Gesundheitskarte-Proxy",
+              log_message,
+              QSystemTrayIcon.Information,
+              5000
+          )
     
     def on_reader_connected(self, connected):
         """Verwalte Änderung des Kartenlese-Gerät-Verbindungsstatus."""
