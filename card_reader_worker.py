@@ -3,19 +3,16 @@ Hintergrund-Worker-Thread für Kartenlese-Operationen.
 Sendet Signale für Statusupdates und Log-Events.
 """
 
+from PyQt5.QtWidgets import QSystemTrayIcon
 from PyQt5.QtCore import QThread, pyqtSignal
-from datetime import datetime
-import egk
-
 
 class CardReaderWorker(QThread):
     """Worker-Thread, der Kartenlese-Operationen durchführt."""
     
     # Signale
     reader_connected = pyqtSignal(bool)  # bool: True wenn Lesegerät verbunden
-    log_message = pyqtSignal(str)  # str: Log-Nachricht
     
-    def __init__(self, polling_interval=1000):
+    def __init__(self, log_bridge, polling_interval=1000):
         """
         Initialisiere den Worker.
         
@@ -26,12 +23,13 @@ class CardReaderWorker(QThread):
         self.polling_interval = polling_interval
         self.is_running = True
         self.last_reader_state = None
+        self.log_bridge = log_bridge
         
     def run(self):
         """Hauptschleife - Kontinuierlich Lesegerät überprüfen und Karten lesen."""
         from PyQt5.QtCore import QTimer
         
-        self.log_message.emit(f"Kartenlese-Worker gestartet")
+        self.log_bridge.message.emit(f"Kartenlese-Worker gestartet", QSystemTrayIcon.Information)
         
         # Erstelle einen Timer für Abfragen
         timer = QTimer()
@@ -56,9 +54,9 @@ class CardReaderWorker(QThread):
             self.last_reader_state = reader_available
             
             if reader_available:
-                self.log_message.emit(f"✓ Kartenlesegerät verbunden")
+                self.log_bridge.message.emit(f"✓ Kartenlesegerät verbunden", QSystemTrayIcon.Warning)
             else:
-                self.log_message.emit(f"✗ Kartenlesegerät getrennt")
+                self.log_bridge.message.emit(f"✗ Kartenlesegerät getrennt", QSystemTrayIcon.Critical)
     
     def _is_reader_available(self):
         """Überprüfe, ob ein Kartenlesegerät verfügbar ist."""

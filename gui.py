@@ -15,13 +15,13 @@ import egk
 from smartcard.Exceptions import NoCardException, CardConnectionException
 
 class GuiLogBridge(QObject):
-    message = pyqtSignal(str)
+    message = pyqtSignal(str, object)
 class HealthCardHTTPServer(ThreadingHTTPServer):
     def __init__(self, server_address, handler_class, log_bridge):
         super().__init__(server_address, handler_class)
         self.log_bridge = log_bridge
 
-        self.log_bridge.message.emit('HTTPServer started')
+        self.log_bridge.message.emit('HTTPServer started', QSystemTrayIcon.Information)
 
 class HealthCardRequestHandler(BaseHTTPRequestHandler):
 
@@ -40,16 +40,18 @@ class HealthCardRequestHandler(BaseHTTPRequestHandler):
         try:
           json_str = json.dumps(egk.read_egk())
           self.wfile.write(bytes(json_str.encode(encoding='utf-8')))
-          self.server.log_bridge.message.emit("Lesen erfolgreich")
+          self.server.log_bridge.message.emit("Lesen erfolgreich", QSystemTrayIcon.Information)
         except NoCardException:
-            self.server.log_bridge.message.emit("Lesen fehlgeschlagen - keine Karte gesteckt")
+            self.server.log_bridge.message.emit("Lesen fehlgeschlagen - keine Karte gesteckt", QSystemTrayIcon.Critical)
         except CardConnectionException:
-            self.server.log_bridge.message.emit("Lesen fehlgeschlagen - Karte steckt nicht richtig")
+            self.server.log_bridge.message.emit("Lesen fehlgeschlagen - Karte steckt nicht richtig", QSystemTrayIcon.Critical)
         except Exception as e:
-            self.server.log_bridge.message.emit(f"Lesen fehlgeschlagen - {str(e)}")
+            self.server.log_bridge.message.emit(f"Lesen fehlgeschlagen - {str(e)}", QSystemTrayIcon.Critical)
 
 class CardReaderGUI(QMainWindow):
     """Hauptfenster für die Kartenlese-Geräteüberwachung."""
+
+    appNameShort = "Kartenleser"
     
     def __init__(self):
         super().__init__()
@@ -145,7 +147,7 @@ class CardReaderGUI(QMainWindow):
             }
         """
     
-    def add_log(self, message, *, timestamp = None):
+    def add_log(self, message, category, *, timestamp = None):
         """Füge eine Nachricht zum Log hinzu."""
         timestamp = timestamp if timestamp is not None else datetime.now().strftime("%H:%M:%S")
         log_message = f"[{timestamp}] {message}"
@@ -154,11 +156,12 @@ class CardReaderGUI(QMainWindow):
         # Automatisches Scrollen nach unten
         scrollbar = self.log_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
-        if hasattr(self, "tray_icon") and self.tray_icon.supportsMessages():
+        if hasattr(self, "tray_icon") and self.tray_icon.supportsMessages() and category is not QSystemTrayIcon.Information:
+          # Keine Tray-Message wenn es nur eine Info ist
           self.tray_icon.showMessage(
-              "EDP-Gesundheitskarte-Proxy",
+              self.appNameShort,
               log_message,
-              QSystemTrayIcon.Information,
+              category,
               5000
           )
     
@@ -177,18 +180,12 @@ class CardReaderGUI(QMainWindow):
             self.status_text.setText("Getrennt")
             self.status_text.setStyleSheet("color: #f44336; font-weight: bold; font-size: 12px;")
     
-    def on_log_message(self, message):
-        """Verwalte Log-Nachricht vom Worker."""
-        self.add_log(message)
-    
     def start_monitoring(self):
         """Starte die Kartenlese-Geräteüberwachung."""
-        self.add_log("Starte Kartenlese-Geräteüberwachung...")
         
         # Erstelle und starte Worker-Thread
-        self.worker = CardReaderWorker(polling_interval=1000)
+        self.worker = CardReaderWorker(polling_interval=1000, log_bridge=self.log_bridge)
         self.worker.reader_connected.connect(self.on_reader_connected)
-        self.worker.log_message.connect(self.on_log_message)
         self.worker.start()
 
     def stop_http_server(self):
@@ -207,7 +204,7 @@ class CardReaderGUI(QMainWindow):
         else:
           self.hide()
           self.tray_icon.showMessage(
-              "EDP-Gesundheitskarte-Proxy",
+              self.appNameShort,
               "Die Anwendung läuft weiter im Infobereich.",
               QSystemTrayIcon.Information,
               3000
