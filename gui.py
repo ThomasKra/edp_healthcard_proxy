@@ -212,9 +212,11 @@ class CardReaderGUI(QMainWindow):
           event.ignore()
 
     def init_tray(self):
-      self.tray_icon = QSystemTrayIcon(self)
 
-      icon = QIcon.fromTheme("media-flash")
+      icon = QIcon('icons/Icon.png')
+      self.tray_icon = QSystemTrayIcon(icon, self)
+
+      # icon = QIcon.fromTheme("media-flash")
       if icon.isNull():
           icon = self.style().standardIcon(self.style().SP_ComputerIcon)
 
